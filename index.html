@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คลังโจทย์ปัญหาร้อยละ ป.5 (เต็มจอ)</title>
+    <!-- โหลด Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- โหลดฟอนต์ TH SarabunPSK และ Sarabun เป็นฟอนต์สำรอง -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <!-- โหลด Font Awesome สำหรับไอคอน -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body, h1, h2, h3, button, input, .font-heading {
+            font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important;
+        }
+        body {
+            transition: background 0.7s ease-in-out;
+        }
+        .fade-in {
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.99); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .float-anim {
+            animation: float 4s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        #drawing-canvas {
+            touch-action: none; /* ป้องกันการเลื่อนจอขณะใช้ปากกา iPad หรือนิ้ววาด */
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 9999px; }
+    </style>
+</head>
+<body id="app-body" class="min-h-screen flex flex-col justify-between bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 text-slate-800 selection:bg-indigo-200 relative overflow-x-hidden">
+
+    <!-- ผืนผ้าใบสำหรับใช้ปากกา iPad / Apple Pencil เขียนได้เต็มพื้นที่หน้าจอ -->
+    <canvas id="drawing-canvas" class="fixed inset-0 w-full h-full z-10 pointer-events-none"></canvas>
+
+    <!-- แถบควบคุมด้านบนแบบมินิมอล โปร่ง โล่ง -->
+    <header class="w-full px-6 py-4 flex flex-wrap items-center justify-between gap-3 z-20">
+        <!-- ป้ายบอกเลขข้อและระดับ -->
+        <div class="flex items-center gap-2.5">
+            <button onclick="toggleAllListModal()" class="bg-white/80 hover:bg-white backdrop-blur-md text-slate-800 font-heading font-bold px-5 py-2 rounded-full shadow-sm border border-white/60 transition-all flex items-center gap-2 text-xl sm:text-2xl" title="คลิกเพื่อเลือกข้อหรือดูสารบัญ">
+                <span id="q-number-badge">ข้อที่ 1 / 100</span>
+                <i class="fa-solid fa-caret-down text-slate-400 text-base"></i>
+            </button>
+            <span id="q-level-badge" class="hidden sm:inline-flex items-center px-4 py-1.5 rounded-full text-base sm:text-lg font-bold bg-white/70 backdrop-blur-md text-emerald-800 border border-white/50 shadow-sm">
+                ระดับง่าย
+            </span>
+        </div>
+
+        <!-- ปุ่มควบคุมด้านขวา (ตัวกรองย่อ / เต็มจอ) -->
+        <div class="flex items-center gap-2">
+            <!-- เลือกระดับแบบกะทัดรัด -->
+            <div class="hidden md:flex bg-white/60 backdrop-blur-md p-1 rounded-full border border-white/60 shadow-sm text-base font-heading font-bold">
+                <button onclick="setFilter('all')" data-level="all" class="filter-btn active px-3.5 py-1 rounded-full bg-slate-800 text-white transition-all">ทั้งหมด</button>
+                <button onclick="setFilter('easy')" data-level="easy" class="filter-btn px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition-all">ง่าย</button>
+                <button onclick="setFilter('medium')" data-level="medium" class="filter-btn px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition-all">ปานกลาง</button>
+                <button onclick="setFilter('hard')" data-level="hard" class="filter-btn px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition-all">ยาก</button>
+            </div>
+
+            <button onclick="toggleFullScreen()" id="fullscreen-btn" class="bg-white/80 hover:bg-white backdrop-blur-md text-slate-700 w-10 h-10 rounded-full shadow-sm border border-white/60 flex items-center justify-center transition-all" title="ขยายเต็มหน้าจอ">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- แถบเครื่องมือปากกา iPad (ซ่อนไว้เริ่มต้น จะแสดงเมื่อกดเปิดโหมดเขียน) -->
+    <div id="pen-toolbar" class="hidden fixed top-20 right-6 z-30 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl shadow-xl border border-slate-200 flex flex-col items-center gap-2.5 fade-in">
+        <button onclick="setPenColor('#1e293b', this)" class="pen-color-btn w-8 h-8 rounded-full bg-slate-800 ring-2 ring-offset-2 ring-slate-800 transition-transform scale-110" title="ปากกาสีดำ"></button>
+        <button onclick="setPenColor('#2563eb', this)" class="pen-color-btn w-8 h-8 rounded-full bg-blue-600 hover:scale-110 transition-transform" title="ปากกาสีน้ำเงิน"></button>
+        <button onclick="setPenColor('#dc2626', this)" class="pen-color-btn w-8 h-8 rounded-full bg-red-600 hover:scale-110 transition-transform" title="ปากกาสีแดง"></button>
+        <button onclick="setPenColor('#16a34a', this)" class="pen-color-btn w-8 h-8 rounded-full bg-green-600 hover:scale-110 transition-transform" title="ปากกาสีเขียว"></button>
+        <div class="w-6 h-px bg-slate-200 my-0.5"></div>
+        <button onclick="setEraser(this)" id="eraser-btn" class="w-9 h-9 rounded-xl text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors" title="ยางลบ">
+            <i class="fa-solid fa-eraser text-base"></i>
+        </button>
+        <button onclick="clearCanvas()" class="w-9 h-9 rounded-xl text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors" title="ล้างกระดานทั้งหมด">
+            <i class="fa-solid fa-trash-can text-base"></i>
+        </button>
+    </div>
+
+    <!-- พื้นที่แสดงโจทย์หลักแบบเต็มจอ โล่ง โปร่ง -->
+    <main class="flex-grow flex flex-col items-center justify-center w-full max-w-6xl mx-auto px-6 sm:px-12 py-4 pointer-events-none select-none">
+        <div id="question-stage" class="w-full flex flex-col items-center text-center fade-in">
+            
+            <!-- ภาพประกอบ SVG ที่เกี่ยวข้องกับโจทย์ -->
+            <div id="q-illustration" class="mb-6 sm:mb-8 float-anim drop-shadow-md">
+                <!-- SVG จะถูกแทรกอัตโนมัติตามเนื้อหาโจทย์ -->
+            </div>
+
+            <!-- ข้อความโจทย์ขนาดใหญ่ อ่านง่ายชัดเจน -->
+            <h1 id="q-text" class="text-4xl sm:text-5xl md:text-6xl lg:text-[4rem] font-bold text-slate-900 leading-snug sm:leading-normal tracking-normal max-w-5xl">
+                กำลังโหลดโจทย์...
+            </h1>
+
+            <!-- กล่องแสดงเฉลยละเอียด (ซ่อนไว้เริ่มต้น จะแสดงเมื่อกดปุ่มเฉลย) -->
+            <div id="answer-box" class="hidden w-full max-w-4xl mt-8 sm:mt-10 text-left fade-in pointer-events-auto z-20">
+                <div class="bg-white/90 backdrop-blur-xl border border-white rounded-3xl p-6 sm:p-8 shadow-xl space-y-5">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div class="flex items-center gap-2.5 text-emerald-700 font-heading font-bold text-2xl sm:text-3xl">
+                            <i class="fa-solid fa-lightbulb text-amber-500"></i>
+                            <span>วิธีคิดและเฉลยละเอียด</span>
+                        </div>
+                        <button onclick="copyQuestionText()" class="text-slate-400 hover:text-slate-700 text-lg font-bold flex items-center gap-1.5 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors">
+                            <i class="fa-regular fa-copy"></i> คัดลอก
+                        </button>
+                    </div>
+                    
+                    <div id="q-explanation" class="space-y-3 text-slate-800 text-2xl sm:text-3xl leading-relaxed">
+                        <!-- ขั้นตอนวิธีคิด -->
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 rounded-2xl shadow-md">
+                        <span class="font-heading font-bold text-lg uppercase tracking-wider bg-black/20 px-3.5 py-1 rounded-lg w-fit shrink-0">คำตอบ</span>
+                        <span id="q-final-answer" class="font-bold text-3xl sm:text-4xl"></span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- แถบปุ่มควบคุมด้านล่างแบบลอยตัว (Floating Dock) -->
+    <footer class="w-full px-6 py-5 flex flex-wrap items-center justify-center gap-3 sm:gap-4 z-20">
+        <button onclick="prevQuestion()" class="bg-white/85 hover:bg-white backdrop-blur-md text-slate-700 font-heading font-bold px-6 py-3 rounded-full shadow-sm border border-white/60 transition-all flex items-center gap-2 text-xl sm:text-2xl active:scale-95">
+            <i class="fa-solid fa-arrow-left text-base"></i>
+            <span class="hidden sm:inline">ก่อนหน้า</span>
+        </button>
+
+        <button onclick="pickRandomQuestion()" class="bg-slate-900 hover:bg-slate-800 text-white font-heading font-bold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center gap-2.5 text-xl sm:text-2xl active:scale-95">
+            <i class="fa-solid fa-shuffle text-amber-400 text-base"></i>
+            <span>สุ่มโจทย์ใหม่</span>
+        </button>
+
+        <button id="toggle-answer-btn" onclick="toggleAnswer()" class="bg-white/90 hover:bg-white backdrop-blur-md text-indigo-700 font-heading font-bold px-8 py-3 rounded-full shadow-md border border-indigo-100 transition-all flex items-center gap-2 text-xl sm:text-2xl active:scale-95">
+            <i class="fa-solid fa-eye text-indigo-500 text-base"></i>
+            <span id="toggle-answer-text">ดูเฉลย</span>
+        </button>
+
+        <button id="toggle-pen-btn" onclick="toggleDrawingMode()" class="bg-white/90 hover:bg-white backdrop-blur-md text-amber-700 font-heading font-bold px-7 py-3 rounded-full shadow-md border border-amber-200 transition-all flex items-center gap-2 text-xl sm:text-2xl active:scale-95">
+            <i class="fa-solid fa-pen-nib text-amber-500 text-base"></i>
+            <span id="toggle-pen-text">เปิดปากกา</span>
+        </button>
+
+        <button onclick="nextQuestion()" class="bg-white/85 hover:bg-white backdrop-blur-md text-slate-700 font-heading font-bold px-6 py-3 rounded-full shadow-sm border border-white/60 transition-all flex items-center gap-2 text-xl sm:text-2xl active:scale-95">
+            <span class="hidden sm:inline">ถัดไป</span>
+            <i class="fa-solid fa-arrow-right text-base"></i>
+        </button>
+    </footer>
+
+    <!-- หน้าต่าง Modal สารบัญและเลือกข้อ -->
+    <div id="all-list-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-heading font-bold text-lg"><i class="fa-solid fa-list-ol mr-2 text-amber-400"></i>เลือกข้อโจทย์ปัญหา (1 - 100)</h3>
+                <button onclick="toggleAllListModal()" class="text-slate-300 hover:text-white text-xl p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- ตัวกรองใน Modal สำหรับมือถือ -->
+            <div class="p-3 bg-slate-100 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="flex flex-wrap gap-1.5">
+                    <button onclick="setFilter('all'); populateModalList();" class="px-3 py-1.5 rounded-full bg-slate-800 text-white font-bold">ทั้งหมด (100)</button>
+                    <button onclick="setFilter('easy'); populateModalList();" class="px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">ง่าย (1-30)</button>
+                    <button onclick="setFilter('medium'); populateModalList();" class="px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 font-bold">ปานกลาง (31-70)</button>
+                    <button onclick="setFilter('hard'); populateModalList();" class="px-3 py-1.5 rounded-full bg-rose-100 text-rose-800 font-bold">ยาก (71-100)</button>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <input type="number" id="jump-input" min="1" max="100" placeholder="เลขข้อ" class="w-20 px-2.5 py-1 border border-slate-300 rounded-lg text-center">
+                    <button onclick="jumpToQuestion()" class="bg-indigo-600 text-white px-3 py-1 rounded-lg font-bold">ไป</button>
+                </div>
+            </div>
+            <div id="modal-list-container" class="p-4 overflow-y-auto space-y-2 flex-grow">
+                <!-- รายการโจทย์ -->
+            </div>
+        </div>
+    </div>
+
+    <!-- กล่องแจ้งเตือน Toast -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-2.5 rounded-full shadow-lg text-sm font-medium transform -translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-msg">คัดลอกเรียบร้อยแล้ว</span>
+    </div>
+
+    <script>
+        // =========================================================================
+        // ชุดธีมสีพื้นหลังพาสเทลสดใส เปลี่ยนหมุนเวียนไปตามเลขข้อ
+        // =========================================================================
+        const bgThemes = [
+            "from-emerald-50 via-teal-50 to-cyan-100",
+            "from-sky-50 via-blue-50 to-indigo-100",
+            "from-amber-50 via-orange-50 to-yellow-100",
+            "from-rose-50 via-pink-50 to-fuchsia-100",
+            "from-violet-50 via-purple-50 to-indigo-100",
+            "from-lime-50 via-green-50 to-emerald-100",
+            "from-cyan-50 via-sky-50 to-blue-100",
+            "from-orange-50 via-amber-50 to-rose-100"
+        ];
+
+        // =========================================================================
+        // ฟังก์ชันสร้างภาพประกอบ SVG อัตโนมัติตามบริบทของโจทย์แต่ละข้อ
+        // =========================================================================
+        function getIllustrationSVG(text) {
+            // 1. ผลไม้ / ต้นไม้ / สวน / ทุเรียน / ส้ม / มะม่วง / แอปเปิล
+            if (/ทุเรียน|ส้ม|มะม่วง|แอปเปิล|ผลไม้|ต้นไม้|สวน|ดอกไม้|พริก/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#DCFCE7" stroke="#86EFAC" stroke-width="3"/>
+                    <path d="M60 95V62" stroke="#78350F" stroke-width="7" stroke-linecap="round"/>
+                    <circle cx="60" cy="46" r="24" fill="#22C55E"/>
+                    <circle cx="43" cy="56" r="17" fill="#16A34A"/>
+                    <circle cx="77" cy="56" r="17" fill="#15803D"/>
+                    <circle cx="52" cy="42" r="5" fill="#FACC15"/>
+                    <circle cx="70" cy="48" r="5" fill="#FB923C"/>
+                    <circle cx="60" cy="56" r="4.5" fill="#FACC15"/>
+                </svg>`;
+            }
+            // 2. โรงเรียน / นักเรียน / สอบ / คะแนน / ห้องเรียน
+            if (/นักเรียน|โรงเรียน|สอบ|คะแนน|ห้องเรียน|ลูกเสือ/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#E0E7FF" stroke="#A5B4FC" stroke-width="3"/>
+                    <path d="M60 24V38" stroke="#EF4444" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M60 24L72 29L60 34Z" fill="#EF4444"/>
+                    <path d="M32 54L60 36L88 54H32Z" fill="#4F46E5"/>
+                    <rect x="36" y="54" width="48" height="36" rx="3" fill="#FFFFFF" stroke="#4F46E5" stroke-width="3"/>
+                    <circle cx="60" cy="46" r="5" fill="#FDE047"/>
+                    <rect x="53" y="70" width="14" height="20" rx="2" fill="#818CF8"/>
+                    <rect x="41" y="62" width="8" height="8" rx="1" fill="#BAE6FD"/>
+                    <rect x="71" y="62" width="8" height="8" rx="1" fill="#BAE6FD"/>
+                </svg>`;
+            }
+            // 3. ร้านค้า / ลดราคา / เสื้อผ้า / รองเท้า / กระเป๋า / นาฬิกา / พัดลม / โทรทัศน์ / ตู้เย็น
+            if (/ลดราคา|ติดราคา|เสื้อ|รองเท้า|กระเป๋า|นาฬิกา|พัดลม|โทรทัศน์|ตู้เย็น|โทรศัพท์|จักรยาน|โต๊ะ/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#FCE7F3" stroke="#F9A8D4" stroke-width="3"/>
+                    <path d="M38 48H82L78 88H42L38 48Z" fill="#EC4899"/>
+                    <path d="M48 48V40C48 33.3726 53.3726 28 60 28C66.6274 28 72 33.3726 72 40V48" stroke="#BE185D" stroke-width="4" stroke-linecap="round"/>
+                    <circle cx="78" cy="42" r="14" fill="#FACC15" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="78" y="47" text-anchor="middle" fill="#854D0E" font-size="14" font-weight="bold">%</text>
+                </svg>`;
+            }
+            // 4. เงิน / ธนาคาร / ดอกเบี้ย / เก็บออม / กำไร / ขาดทุน / ภาษี
+            if (/เงิน|ธนาคาร|ดอกเบี้ย|ออม|กำไร|ขาดทุน|ภาษี|เหรียญ|กระปุก|รายได้/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#FEF3C7" stroke="#FCD34D" stroke-width="3"/>
+                    <ellipse cx="60" cy="78" rx="26" ry="10" fill="#D97706"/>
+                    <ellipse cx="60" cy="72" rx="26" ry="10" fill="#F59E0B"/>
+                    <ellipse cx="60" cy="64" rx="26" ry="10" fill="#D97706"/>
+                    <ellipse cx="60" cy="58" rx="26" ry="10" fill="#FBBF24"/>
+                    <circle cx="60" cy="42" r="15" fill="#FDE047" stroke="#D97706" stroke-width="2.5"/>
+                    <text x="60" y="48" text-anchor="middle" fill="#B45309" font-size="18" font-weight="bold">฿</text>
+                </svg>`;
+            }
+            // 5. หนังสือ / สมุด / ห้องสมุด / อ่าน
+            if (/หนังสือ|สมุด|หน้า|ห้องสมุด/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#E0F2FE" stroke="#7DD3FC" stroke-width="3"/>
+                    <path d="M28 40C28 37.7909 29.7909 36 32 36H56C58.2091 36 60 37.7909 60 40V84C60 81.7909 58.2091 80 56 80H32C29.7909 80 28 78.2091 28 76V40Z" fill="#3B82F6"/>
+                    <path d="M92 40C92 37.7909 90.2091 36 88 36H64C61.7909 36 60 37.7909 60 40V84C60 81.7909 61.7909 80 64 80H88C90.2091 80 92 78.2091 92 76V40Z" fill="#2563EB"/>
+                    <path d="M34 44H54V74H34V44Z" fill="#FFFFFF"/>
+                    <path d="M66 44H86V74H66V44Z" fill="#F8FAFC"/>
+                </svg>`;
+            }
+            // 6. น้ำ / เครื่องดื่ม / น้ำมัน / ของเหลว / ถังน้ำ
+            if (/น้ำ|นม|น้ำมัน|ถัง|ลิตร|มิลลิลิตร|เครื่องดื่ม/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#CFFAFE" stroke="#67E8F9" stroke-width="3"/>
+                    <path d="M60 28C60 28 38 56 38 72C38 84.1503 47.8497 94 60 94C72.1503 94 82 84.1503 82 72C82 56 60 28 60 28Z" fill="#06B6D4"/>
+                    <path d="M48 72C48 78.6274 53.3726 84 60 84" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+                </svg>`;
+            }
+            // 7. สัตว์ / ไก่ / นก / สวนสัตว์ / ไข่
+            if (/ไก่|นก|สัตว์|ไข่|ตุ๊กตา/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#FFEDD5" stroke="#FDBA74" stroke-width="3"/>
+                    <ellipse cx="60" cy="64" rx="22" ry="27" fill="#FFFBEB" stroke="#F59E0B" stroke-width="3"/>
+                    <circle cx="53" cy="56" r="3" fill="#F59E0B"/>
+                    <circle cx="68" cy="68" r="4" fill="#FCD34D"/>
+                </svg>`;
+            }
+            // 8. อาหาร / ขนม / ข้าวสาร / อาหารกลางวัน / โต๊ะจีน
+            if (/อาหาร|ขนม|ข้าว|เค้ก|ไอศกรีม/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#FEF9C3" stroke="#FDE047" stroke-width="3"/>
+                    <rect x="34" y="58" width="52" height="24" rx="4" fill="#F472B6"/>
+                    <path d="M34 62C39 67 44 67 49 62C54 67 59 67 64 62C69 67 74 67 79 62C82 65 84 65 86 62" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                    <rect x="57" y="42" width="6" height="16" rx="2" fill="#38BDF8"/>
+                    <circle cx="60" cy="37" r="4" fill="#F97316"/>
+                </svg>`;
+            }
+            // 9. การเดินทาง / ระยะทาง / รถ / สนาม
+            if (/ระยะทาง|รถ|กิโลเมตร|เมตร|สนาม|วิ่ง|เชือก/.test(text)) {
+                return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="54" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="3"/>
+                    <path d="M34 86L48 34H72L86 86H34Z" fill="#475569"/>
+                    <path d="M60 40V50M60 58V68M60 76V84" stroke="#FACC15" stroke-width="4" stroke-linecap="round"/>
+                </svg>`;
+            }
+            // 10. ค่าเริ่มต้น: สัญลักษณ์ร้อยละ % สดใส
+            return `<svg class="w-24 h-24 sm:w-28 sm:h-28" viewBox="0 0 120 120" fill="none">
+                <circle cx="60" cy="60" r="54" fill="#EEF2FF" stroke="#C7D2FE" stroke-width="3"/>
+                <line x1="78" y1="38" x2="42" y2="82" stroke="#4F46E5" stroke-width="8" stroke-linecap="round"/>
+                <circle cx="45" cy="45" r="10" fill="#F59E0B" stroke="#FFFFFF" stroke-width="3"/>
+                <circle cx="75" cy="75" r="10" fill="#10B981" stroke="#FFFFFF" stroke-width="3"/>
+            </svg>`;
+        }
+
+        // =========================================================================
+        // ฐานข้อมูลโจทย์ปัญหาร้อยละ 100 ข้อ (เรียงจากง่าย -> ปานกลาง -> ยาก)
+        // =========================================================================
+        const questionsDB = [
+            // ง่าย (1-30)
+            { id: 1, level: "easy", text: "สวนผลไม้แห่งหนึ่งมีต้นทุเรียน 40% ของต้นไม้ทั้งหมด มีความหมายว่าอย่างไร และมีต้นไม้ชนิดอื่นกี่เปอร์เซ็นต์?", steps: ["1. 'ต้นทุเรียน 40% ของต้นไม้ทั้งหมด' หมายความว่า ถ้ามีต้นไม้ทั้งหมด 100 ต้น จะเป็นต้นทุเรียน 40 ต้น", "2. มีต้นไม้ชนิดอื่นเท่ากับ 100 - 40 = 60 ต้น หรือคิดเป็น 60% ของต้นไม้ทั้งหมด"], answer: "ถ้ามีต้นไม้ทั้งหมด 100 ต้น เป็นต้นทุเรียน 40 ต้น และมีต้นไม้ชนิดอื่น 60 ต้น (60%)" },
+            { id: 2, level: "easy", text: "ถ้าโรงเรียนแห่งหนึ่งมีนักเรียน 100 คน มีนักเรียนหญิง 55 คน แสดงว่ามีนักเรียนหญิงคิดเป็นกี่เปอร์เซ็นต์ และมีนักเรียนชายกี่เปอร์เซ็นต์?", steps: ["1. นักเรียนทั้งหมด 100 คน มีนักเรียนหญิง 55 คน คิดเป็นนักเรียนหญิง 55%", "2. มีนักเรียนชายเท่ากับ 100 - 55 = 45 คน คิดเป็นนักเรียนชาย 45%"], answer: "มีนักเรียนหญิง 55% และนักเรียนชาย 45%" },
+            { id: 3, level: "easy", text: "สอบวิชาคณิตศาสตร์ได้คะแนนร้อยละ 85 มีความหมายว่าอย่างไร?", steps: ["1. คำว่า 'ร้อยละ 85' หมายถึง 85 ส่วนใน 100 ส่วน", "2. หมายความว่า ถ้าข้อสอบมีคะแนนเต็ม 100 คะแนน นักเรียนสอบได้ 85 คะแนน (ทำผิด 15 คะแนน)"], answer: "ถ้าคะแนนเต็ม 100 คะแนน สอบได้ 85 คะแนน" },
+            { id: 4, level: "easy", text: "ร้านค้าติดป้าย 'ลดราคาสินค้า 25%' มีความหมายว่าอย่างไร?", steps: ["1. 'ลดราคา 25%' หมายถึง ลดราคาให้ 25 บาท จากราคาป้าย 100 บาท", "2. ผู้ซื้อจะต้องจ่ายเงินจริงเพียง 100 - 25 = 75 บาท"], answer: "ถ้าติดราคาสินค้าไว้ 100 บาท ร้านค้าจะลดราคาให้ 25 บาท (จ่ายจริง 75 บาท)" },
+            { id: 5, level: "easy", text: "ในกล่องมีลูกแก้วทั้งหมด 100 ลูก เป็นลูกแก้วสีแดง 32 ลูก ที่เหลือเป็นลูกแก้วสีฟ้า มีลูกแก้วสีฟ้าคิดเป็นร้อยละเท่าใดของทั้งหมด?", steps: ["1. ลูกแก้วทั้งหมด 100 ลูก เป็นสีแดง 32 ลูก", "2. เหลือเป็นลูกแก้วสีฟ้า = 100 - 32 = 68 ลูก คิดเป็นร้อยละ 68"], answer: "ร้อยละ 68 ของลูกแก้วทั้งหมด" },
+            { id: 6, level: "easy", text: "แม่ค้าขายส้มได้กำไร 30% มีความหมายว่าอย่างไร?", steps: ["1. กำไร 30% เป็นการเทียบกับราคาทุน 100 บาท", "2. หมายความว่า ถ้าลงทุนซื้อส้มมา 100 บาท จะขายได้กำไร 30 บาท (ขายไป 130 บาท)"], answer: "ถ้าลงทุน 100 บาท จะขายได้กำไร 30 บาท" },
+            { id: 7, level: "easy", text: "หนังสือเล่มหนึ่งมี 100 หน้า อ่านไปแล้ว 64 หน้า ยังเหลือหน้าที่ยังไม่ได้อ่านอีกกี่เปอร์เซ็นต์ของหนังสือทั้งเล่ม?", steps: ["1. เหลือหน้าที่ยังไม่ได้อ่าน = 100 - 64 = 36 หน้า", "2. คิดเป็น 36% ของหนังสือทั้งเล่ม"], answer: "36% ของหนังสือทั้งเล่ม" },
+            { id: 8, level: "easy", text: "น้ำผลไม้กล่องหนึ่งเขียนข้างกล่องว่า 'มีน้ำส้มแท้ 18%' มีความหมายว่าอย่างไร?", steps: ["1. ถ้าน้ำผลไม้กล่องนี้มีปริมาตร 100 ส่วน จะมีน้ำส้มแท้อยู่ 18 ส่วน", "2. และมีส่วนผสมอื่น 100 - 18 = 82 ส่วน"], answer: "ถ้าน้ำผลไม้มี 100 ส่วน จะมีน้ำส้มแท้ 18 ส่วน (ส่วนผสมอื่น 82 ส่วน)" },
+            { id: 9, level: "easy", text: "วันนี้มีนักเรียนชั้น ป.5 มาเรียนร้อยละ 94 ของนักเรียนทั้งหมด แสดงว่ามีนักเรียนขาดเรียนกี่เปอร์เซ็นต์?", steps: ["1. นักเรียนทั้งหมดคิดเป็น 100%", "2. ขาดเรียน = 100 - 94 = 6%"], answer: "ขาดเรียน 6%" },
+            { id: 10, level: "easy", text: "ขายรองเท้าขาดทุน 15% มีความหมายว่าอย่างไร?", steps: ["1. ขาดทุน 15% เป็นการเทียบกับราคาทุน 100 บาท", "2. หมายความว่า ถ้าซื้อรองเท้ามาทุน 100 บาท ขายขาดทุนไป 15 บาท (ขายไปเพียง 85 บาท)"], answer: "ถ้าทุน 100 บาท ขายขาดทุน 15 บาท (ขายไป 85 บาท)" },
+            { id: 11, level: "easy", text: "ในตะกร้ามีไข่ไก่ 50 ฟอง แตกไป 7 ฟอง ไข่ไก่ที่แตกคิดเป็นกี่เปอร์เซ็นต์ของไข่ไก่ทั้งหมด?", steps: ["1. ไข่ไก่แตก 7 ฟอง จาก 50 ฟอง = 7/50", "2. ทำส่วนให้เป็น 100 โดยคูณ 2: (7 × 2) / (50 × 2) = 14/100 = 14%"], answer: "14%" },
+            { id: 12, level: "easy", text: "ข้อสอบวิชาวิทยาศาสตร์มี 25 ข้อ ดาวทำถูก 21 ข้อ ดาวทำข้อสอบถูกคิดเป็นร้อยละเท่าใด?", steps: ["1. ทำถูก 21 ข้อ จาก 25 ข้อ = 21/25", "2. คูณ 4 ทั้งเศษและส่วน: (21 × 4) / (25 × 4) = 84/100 = ร้อยละ 84"], answer: "ร้อยละ 84" },
+            { id: 13, level: "easy", text: "มีขนมเค้ก 20 ชิ้น แจกให้เพื่อนไป 9 ชิ้น แจกขนมเค้กไปคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. แจกไป 9 ชิ้น จาก 20 ชิ้น = 9/20", "2. คูณ 5 ทั้งเศษและส่วน: (9 × 5) / (20 × 5) = 45/100 = 45%"], answer: "45%" },
+            { id: 14, level: "easy", text: "ปลูกต้นไม้ 10 ต้น ตายไป 2 ต้น ต้นไม้ที่รอดชีวิตคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. ต้นไม้ที่รอดชีวิต = 10 - 2 = 8 ต้น จาก 10 ต้น", "2. (8 × 10) / (10 × 10) = 80/100 = 80%"], answer: "80%" },
+            { id: 15, level: "easy", text: "ในห้องสมุดมีหนังสือการ์ตูน 40 เล่ม จากหนังสือบนชั้น 100 เล่ม หนังสือที่ไม่ใช่การ์ตูนคิดเป็นร้อยละเท่าใด?", steps: ["1. หนังสือที่ไม่ใช่การ์ตูน = 100 - 40 = 60 เล่ม", "2. คิดเป็นร้อยละ 60"], answer: "ร้อยละ 60" },
+            { id: 16, level: "easy", text: "เก็บเงินใส่กระปุกได้ 50 บาท จากเป้าหมาย 100 บาท เก็บเงินได้คิดเป็นกี่เปอร์เซ็นต์ และยังขาดอีกกี่เปอร์เซ็นต์?", steps: ["1. เก็บได้ 50 บาท จาก 100 บาท คิดเป็น 50%", "2. ยังขาดอีก 100 - 50 = 50%"], answer: "เก็บได้ 50% และยังขาดอีก 50%" },
+            { id: 17, level: "easy", text: "แบตเตอรี่โทรศัพท์มือถือเหลืออยู่ 17% มีความหมายว่าอย่างไร?", steps: ["1. ถ้าแบตเตอรี่เต็ม 100 ส่วน ตอนนี้เหลือพลังงานอยู่ 17 ส่วน", "2. และใช้พลังงานไปแล้ว 100 - 17 = 83 ส่วน"], answer: "ถ้าแบตเตอรี่เต็ม 100 ส่วน เหลือพลังงานอยู่ 17 ส่วน (ใช้ไปแล้ว 83%)" },
+            { id: 18, level: "easy", text: "ในสวนสัตว์มีนก 25 ตัว เป็นนกแก้ว 6 ตัว นกแก้วคิดเป็นกี่เปอร์เซ็นต์ของนกทั้งหมด?", steps: ["1. นกแก้ว 6 ตัว จาก 25 ตัว = 6/25", "2. (6 × 4) / (25 × 4) = 24/100 = 24%"], answer: "24%" },
+            { id: 19, level: "easy", text: "ซื้อเสื้อมา 50 ตัว ขายไปได้ 38 ตัว ขายเสื้อไปได้คิดเป็นร้อยละเท่าใด?", steps: ["1. ขายได้ 38 ตัว จาก 50 ตัว = 38/50", "2. (38 × 2) / (50 × 2) = 76/100 = ร้อยละ 76"], answer: "ร้อยละ 76" },
+            { id: 20, level: "easy", text: "นักเรียน 20 คน ชอบเล่นฟุตบอล 13 คน นักเรียนที่ไม่ชอบเล่นฟุตบอลคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. ไม่ชอบเล่นฟุตบอล = 20 - 13 = 7 คน จาก 20 คน", "2. (7 × 5) / (20 × 5) = 35/100 = 35%"], answer: "35%" },
+            { id: 21, level: "easy", text: "ร้อยละ 15 ของเงิน 200 บาท เท่ากับกี่บาท?", steps: ["1. ร้อยละ 15 = 15/100", "2. (15/100) × 200 = 30 บาท"], answer: "30 บาท" },
+            { id: 22, level: "easy", text: "25% ของนักเรียน 400 คน คิดเป็นกี่คน?", steps: ["1. 25% = 25/100", "2. (25/100) × 400 = 100 คน"], answer: "100 คน" },
+            { id: 23, level: "easy", text: "50% ของระยะทาง 360 กิโลเมตร เท่ากับกี่กิโลเมตร?", steps: ["1. 50% มีค่าเท่ากับครึ่งหนึ่ง (50/100 = 1/2)", "2. 360 ÷ 2 = 180 กิโลเมตร"], answer: "180 กิโลเมตร" },
+            { id: 24, level: "easy", text: "10% ของเงิน 850 บาท เท่ากับกี่บาท?", steps: ["1. 10% = 10/100", "2. (10/100) × 850 = 85 บาท"], answer: "85 บาท" },
+            { id: 25, level: "easy", text: "ธนาคารให้ดอกเบี้ยเงินฝากร้อยละ 2 ต่อปี มีความหมายว่าอย่างไร?", steps: ["1. ดอกเบี้ยร้อยละ 2 ต่อปี เทียบกับเงินต้น 100 บาท ในเวลา 1 ปี", "2. หมายความว่า ถ้าฝากเงิน 100 บาท ครบ 1 ปี จะได้ดอกเบี้ย 2 บาท"], answer: "ถ้าฝากเงิน 100 บาท ครบ 1 ปี จะได้รับดอกเบี้ย 2 บาท" },
+            { id: 26, level: "easy", text: "มีดอกกุหลาบ 200 ดอก เป็นดอกกุหลาบสีขาว 46 ดอก ดอกกุหลาบสีขาวคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. กุหลาบสีขาว 46 ดอก จาก 200 ดอก = 46/200", "2. (46 ÷ 2) / (200 ÷ 2) = 23/100 = 23%"], answer: "23%" },
+            { id: 27, level: "easy", text: "ร้านขายไอศกรีมมีไอศกรีม 300 แท่ง ขายไปได้ 150 แท่ง ขายไปได้คิดเป็นร้อยละเท่าใด?", steps: ["1. ขายได้ 150 แท่ง จาก 300 แท่ง = 150/300", "2. (150 ÷ 3) / (300 ÷ 3) = 50/100 = ร้อยละ 50"], answer: "ร้อยละ 50" },
+            { id: 28, level: "easy", text: "ผ้าผืนหนึ่งมีส่วนผสมของฝ้าย 65% และใยสังเคราะห์ 35% ถ้าผ้าหนัก 100 กรัม จะมีฝ้ายหนักกี่กรัม?", steps: ["1. ฝ้าย 65% หมายถึง ในผ้าหนัก 100 กรัม มีฝ้ายอยู่ 65 กรัม"], answer: "65 กรัม" },
+            { id: 29, level: "easy", text: "20% ของแอปเปิล 500 ผล เท่ากับกี่ผล?", steps: ["1. (20/100) × 500 = 20 × 5 = 100 ผล"], answer: "100 ผล" },
+            { id: 30, level: "easy", text: "ร้อยละ 75 ของคะแนนเต็ม 200 คะแนน เท่ากับกี่คะแนน?", steps: ["1. (75/100) × 200 = 75 × 2 = 150 คะแนน"], answer: "150 คะแนน" },
+
+            // ปานกลาง (31-70)
+            { id: 31, level: "medium", text: "โรงเรียนแห่งหนึ่งมีนักเรียนทั้งหมด 560 คน มีนักเรียนหญิง 55% ของนักเรียนทั้งหมด โรงเรียนนี้มีนักเรียนหญิงกี่คน และนักเรียนชายกี่คน?", steps: ["1. นักเรียนหญิง 55% ของ 560 คน = (55/100) × 560 = 308 คน", "2. นักเรียนชาย = 560 - 308 = 252 คน"], answer: "นักเรียนหญิง 308 คน และนักเรียนชาย 252 คน" },
+            { id: 32, level: "medium", text: "สวนผลไม้แห่งหนึ่งมีต้นไม้ทั้งหมด 350 ต้น เป็นต้นทุเรียน 40% ของต้นไม้ทั้งหมด ในสวนนี้มีต้นทุเรียนกี่ต้น และต้นไม้ชนิดอื่นกี่ต้น?", steps: ["1. ต้นทุเรียน 40% ของ 350 ต้น = (40/100) × 350 = 140 ต้น", "2. ต้นไม้ชนิดอื่น = 350 - 140 = 210 ต้น"], answer: "ต้นทุเรียน 140 ต้น และต้นไม้ชนิดอื่น 210 ต้น" },
+            { id: 33, level: "medium", text: "หนังสือสารานุกรมเล่มหนึ่งมี 240 หน้า นิดอ่านไปแล้ว 35% ของจำนวนหน้าทั้งหมด นิดอ่านไปแล้วกี่หน้า?", steps: ["1. อ่านไปแล้ว = (35/100) × 240 = 84 หน้า"], answer: "84 หน้า" },
+            { id: 34, level: "medium", text: "คุณพ่อมีเงินเดือน 25,000 บาท แบ่งเก็บออมไว้ 18% ของเงินเดือน คุณพ่อเก็บออมเงินเดือนละกี่บาท?", steps: ["1. เก็บออม = (18/100) × 25,000 = 4,500 บาท"], answer: "4,500 บาท" },
+            { id: 35, level: "medium", text: "ในการสอบแข่งขันมีผู้เข้าสอบ 450 คน สอบผ่านร้อยละ 62 ของผู้เข้าสอบทั้งหมด มีผู้สอบผ่านกี่คน?", steps: ["1. สอบผ่าน = (62/100) × 450 = 279 คน"], answer: "279 คน" },
+            { id: 36, level: "medium", text: "ฟาร์มเลี้ยงไก่มีไก่ทั้งหมด 1,200 ตัว เป็นไก่ไข่ 75% ที่เหลือเป็นไก่เนื้อ ฟาร์มนี้มีไก่เนื้อกี่ตัว?", steps: ["1. ไก่ไข่ = (75/100) × 1,200 = 900 ตัว", "2. ไก่เนื้อ = 1,200 - 900 = 300 ตัว"], answer: "300 ตัว" },
+            { id: 37, level: "medium", text: "กระเป๋านักเรียนติดราคาไว้ 650 บาท ร้านค้าลดราคาให้ 20% ร้านค้าลดราคาให้กี่บาท?", steps: ["1. ลดราคาให้ = (20/100) × 650 = 130 บาท"], answer: "130 บาท" },
+            { id: 38, level: "medium", text: "แม่ค้าซื้อพัดลมมาราคา 800 บาท นำไปขายได้กำไร 15% แม่ค้าขายพัดลมได้กำไรกี่บาท?", steps: ["1. กำไร = (15/100) × 800 = 120 บาท"], answer: "120 บาท" },
+            { id: 39, level: "medium", text: "พ่อค้าซื้อนาฬิกามา 1,500 บาท ขายขาดทุนไป 12% พ่อค้าขายขาดทุนกี่บาท?", steps: ["1. ขาดทุน = (12/100) × 1,500 = 180 บาท"], answer: "180 บาท" },
+            { id: 40, level: "medium", text: "ห้องสมุดมีหนังสือทั้งหมด 3,400 เล่ม เป็นหนังสือวิชาการ 45% มีหนังสือวิชาการกี่เล่ม?", steps: ["1. หนังสือวิชาการ = (45/100) × 3,400 = 1,530 เล่ม"], answer: "1,530 เล่ม" },
+            { id: 41, level: "medium", text: "ถังเก็บน้ำใบหนึ่งมีความจุ 2,500 ลิตร มีน้ำอยู่ร้อยละ 68 ของความจุถัง มีน้ำอยู่ในถังกี่ลิตร?", steps: ["1. ปริมาณน้ำ = (68/100) × 2,500 = 1,700 ลิตร"], answer: "1,700 ลิตร" },
+            { id: 42, level: "medium", text: "หมู่บ้านแห่งหนึ่งมีประชากร 850 คน เป็นผู้สูงอายุ 24% ของประชากรทั้งหมด หมู่บ้านนี้มีผู้สูงอายุกี่คน?", steps: ["1. ผู้สูงอายุ = (24/100) × 850 = 204 คน"], answer: "204 คน" },
+            { id: 43, level: "medium", text: "ร้านค้ามีเสื้อยืด 400 ตัว ขายไปได้ 260 ตัว ร้านค้าขายเสื้อยืดไปได้คิดเป็นร้อยละเท่าใดของเสื้อทั้งหมด?", steps: ["1. คิดเป็นร้อยละ = (260 / 400) × 100 = 65"], answer: "ร้อยละ 65" },
+            { id: 44, level: "medium", text: "คุณแม่ให้เงินไปโรงเรียน 80 บาท ใช้ซื้ออาหารกลางวันไป 36 บาท ใช้เงินไปคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. คิดเป็นเปอร์เซ็นต์ = (36 / 80) × 100 = 45%"], answer: "45%" },
+            { id: 45, level: "medium", text: "สอบเก็บคะแนนวิชาภาษาอังกฤษเต็ม 40 คะแนน ก้องสอบได้ 34 คะแนน ก้องสอบได้คิดเป็นร้อยละเท่าใด?", steps: ["1. คิดเป็นร้อยละ = (34 / 40) × 100 = 85"], answer: "ร้อยละ 85" },
+            { id: 46, level: "medium", text: "ระยะทางจากบ้านไปโรงเรียน 1,800 เมตร เดินทางไปแล้ว 65% ของระยะทางทั้งหมด เหลือระยะทางอีกกี่เมตร?", steps: ["1. เดินทางไปแล้ว = (65/100) × 1,800 = 1,170 เมตร", "2. เหลือระยะทางอีก = 1,800 - 1,170 = 630 เมตร"], answer: "630 เมตร" },
+            { id: 47, level: "medium", text: "สมุดบันทึกเล่มหนึ่งมี 160 หน้า ใช้จดบันทึกไปแล้ว 45% ยังเหลือหน้าว่างอีกกี่หน้า?", steps: ["1. จดไปแล้ว = (45/100) × 160 = 72 หน้า", "2. เหลือหน้าว่าง = 160 - 72 = 88 หน้า"], answer: "88 หน้า" },
+            { id: 48, level: "medium", text: "ตะกร้าใบหนึ่งมีมะม่วง 150 ผล เน่าเสียไป 18 ผล มะม่วงที่เน่าเสียคิดเป็นกี่เปอร์เซ็นต์ของมะม่วงทั้งหมด?", steps: ["1. คิดเป็นเปอร์เซ็นต์ = (18 / 150) × 100 = 12%"], answer: "12%" },
+            { id: 49, level: "medium", text: "รองเท้ากีฬาติดราคาไว้ 1,250 บาท ลดราคา 30% จะลดราคาให้กี่บาท?", steps: ["1. ส่วนลด = (30/100) × 1,250 = 375 บาท"], answer: "375 บาท" },
+            { id: 50, level: "medium", text: "โรงภาพยนตร์แห่งหนึ่งมีที่นั่งทั้งหมด 320 ที่นั่ง มีผู้เข้าชมร้อยละ 85 ของที่นั่งทั้งหมด มีที่นั่งว่างกี่ที่นั่ง?", steps: ["1. มีผู้เข้าชม = (85/100) × 320 = 272 ที่นั่ง", "2. ที่นั่งว่าง = 320 - 272 = 48 ที่นั่ง"], answer: "48 ที่นั่ง" },
+            { id: 51, level: "medium", text: "ปลูกต้นกล้าพริก 250 ต้น ตายไป 35 ต้น ต้นกล้าที่ตายคิดเป็นร้อยละเท่าใด?", steps: ["1. คิดเป็นร้อยละ = (35 / 250) × 100 = 14"], answer: "ร้อยละ 14" },
+            { id: 52, level: "medium", text: "ฝากเงินออมทรัพย์ 4,000 บาท ธนาคารให้ดอกเบี้ย 2.5% ต่อปี เมื่อครบ 1 ปี จะได้รับดอกเบี้ยกี่บาท?", steps: ["1. ดอกเบี้ย = (2.5 / 100) × 4,000 = 100 บาท"], answer: "100 บาท" },
+            { id: 53, level: "medium", text: "ในงานวิ่งการกุศลมีผู้สมัคร 1,500 คน เป็นผู้หญิง 48% และที่เหลือเป็นผู้ชาย มีผู้สมัครชายมากกว่าหรือน้อยกว่าผู้สมัครหญิงกี่คน?", steps: ["1. ผู้หญิง = (48/100) × 1,500 = 720 คน", "2. ผู้ชาย = 1,500 - 720 = 780 คน", "3. ผู้ชายมากกว่าผู้หญิง = 780 - 720 = 60 คน"], answer: "ผู้สมัครชายมากกว่าผู้สมัครหญิง 60 คน" },
+            { id: 54, level: "medium", text: "คุณพ่อมีเงิน 5,000 บาท ซื้อของขวัญให้คุณแม่ 1,250 บาท คุณพ่อใช้เงินซื้อของขวัญคิดเป็นกี่เปอร์เซ็นต์ของเงินที่มี?", steps: ["1. คิดเป็นเปอร์เซ็นต์ = (1,250 / 5,000) × 100 = 25%"], answer: "25%" },
+            { id: 55, level: "medium", text: "กระปุกออมสินใบหนึ่งมีเหรียญทั้งหมด 420 เหรียญ เป็นเหรียญสิบบาท 35% เป็นเหรียญห้าบาท 40% ที่เหลือเป็นเหรียญบาท มีเหรียญบาทกี่เหรียญ?", steps: ["1. เหรียญบาทคิดเป็น = 100% - (35% + 40%) = 25%", "2. จำนวนเหรียญบาท = (25/100) × 420 = 105 เหรียญ"], answer: "105 เหรียญ" },
+            { id: 56, level: "medium", text: "ซื้อเสื้อราคาทุน 200 บาท ขายไปราคา 250 บาท ได้กำไรกี่เปอร์เซ็นต์?", steps: ["1. กำไร = 250 - 200 = 50 บาท", "2. คิดเป็นกำไร = (50 / 200) × 100 = 25%"], answer: "กำไร 25%" },
+            { id: 57, level: "medium", text: "ซื้อจักรยานมาราคา 2,000 บาท ขายไปในราคา 1,700 บาท ขาดทุนร้อยละเท่าใด?", steps: ["1. ขาดทุน = 2,000 - 1,700 = 300 บาท", "2. คิดเป็นร้อยละ = (300 / 2,000) × 100 = 15"], answer: "ขาดทุนร้อยละ 15" },
+            { id: 58, level: "medium", text: "โรงงานผลิตตุ๊กตาได้ 2,400 ตัว ตรวจสอบพบว่ามีตำหนิ 3% ของทั้งหมด มีตุ๊กตาที่สมบูรณ์กี่ตัว?", steps: ["1. ตุ๊กตามีตำหนิ = (3/100) × 2,400 = 72 ตัว", "2. ตุ๊กตาที่สมบูรณ์ = 2,400 - 72 = 2,328 ตัว"], answer: "2,328 ตัว" },
+            { id: 59, level: "medium", text: "ในห้องเรียน ป.5 มีนักเรียน 40 คน วันนี้ฝนตกหนักจึงมีนักเรียนมาเรียนเพียง 30 คน มีนักเรียนขาดเรียนคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. ขาดเรียน = 40 - 30 = 10 คน", "2. คิดเป็นเปอร์เซ็นต์ = (10 / 40) × 100 = 25%"], answer: "25%" },
+            { id: 60, level: "medium", text: "ที่ดินแปลงหนึ่งมีพื้นที่ 600 ตารางวา แบ่งขุดบ่อเลี้ยงปลา 28% ของพื้นที่ทั้งหมด พื้นที่บ่อเลี้ยงปลามีกี่ตารางวา?", steps: ["1. พื้นที่บ่อเลี้ยงปลา = (28/100) × 600 = 168 ตารางวา"], answer: "168 ตารางวา" },
+            { id: 61, level: "medium", text: "เชือกเส้นหนึ่งยาว 75 เมตร ตัดนำไปใช้ 44% ของความยาวเชือกทั้งหมด เหลือเชือกยาวกี่เมตร?", steps: ["1. ตัดไปใช้ = (44/100) × 75 = 33 เมตร", "2. เหลือเชือกยาว = 75 - 33 = 42 เมตร"], answer: "42 เมตร" },
+            { id: 62, level: "medium", text: "ร้านค้าติดราคาพัดลม 1,000 บาท แต่ลดราคาให้ลูกค้าเหลือ 820 บาท ร้านค้าลดราคาให้กี่เปอร์เซ็นต์?", steps: ["1. ส่วนลด = 1,000 - 820 = 180 บาท", "2. คิดเป็นเปอร์เซ็นต์ = (180 / 1,000) × 100 = 18%"], answer: "18%" },
+            { id: 63, level: "medium", text: "น้ำหนักตัวของแก้วตาคือ 45 กิโลกรัม น้ำหนักของไขมันคิดเป็น 20% ของน้ำหนักตัว แก้วตามีน้ำหนักไขมันกี่กิโลกรัม?", steps: ["1. น้ำหนักไขมัน = (20/100) × 45 = 9 กิโลกรัม"], answer: "9 กิโลกรัม" },
+            { id: 64, level: "medium", text: "ข้าวสารกระสอบหนึ่งหนัก 50 กิโลกรัม แบ่งหุงกินไปแล้ว 19 กิโลกรัม เหลือข้าวสารคิดเป็นร้อยละเท่าใดของกระสอบ?", steps: ["1. เหลือข้าวสาร = 50 - 19 = 31 กิโลกรัม", "2. คิดเป็นร้อยละ = (31 / 50) × 100 = 62"], answer: "ร้อยละ 62" },
+            { id: 65, level: "medium", text: "จัดงานเลี้ยงโต๊ะจีน 80 โต๊ะ มีแขกนั่งเต็ม 95% ของจำนวนโต๊ะทั้งหมด มีโต๊ะที่ไม่มีแขกนั่งกี่โต๊ะ?", steps: ["1. โต๊ะว่างคิดเป็น = 100% - 95% = 5%", "2. จำนวนโต๊ะว่าง = (5/100) × 80 = 4 โต๊ะ"], answer: "4 โต๊ะ" },
+            { id: 66, level: "medium", text: "สมุด 1 โหล (12 เล่ม) แจกให้น้องไป 3 เล่ม แจกสมุดไปคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. คิดเป็นเปอร์เซ็นต์ = (3 / 12) × 100 = 25%"], answer: "25%" },
+            { id: 67, level: "medium", text: "รถบรรทุกน้ำมันบรรทุกน้ำมันมา 12,000 ลิตร ส่งให้ปั๊มน้ำมันแห่งแรกไป 35% เหลือน้ำมันในรถกี่ลิตร?", steps: ["1. ส่งให้ปั๊มแรก = (35/100) × 12,000 = 4,200 ลิตร", "2. เหลือน้ำมัน = 12,000 - 4,200 = 7,800 ลิตร"], answer: "7,800 ลิตร" },
+            { id: 68, level: "medium", text: "ซื้อส้มโอมา 80 ผล ขายไป 68 ผล เหลือส้มโอคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. เหลือส้มโอ = 80 - 68 = 12 ผล", "2. คิดเป็นเปอร์เซ็นต์ = (12 / 80) × 100 = 15%"], answer: "15%" },
+            { id: 69, level: "medium", text: "สหกรณ์โรงเรียนจ่ายเงินปันผลร้อยละ 6 ต่อปี ถ้านักเรียนมีหุ้นอยู่ 1,500 บาท จะได้รับเงินปันผลกี่บาท?", steps: ["1. เงินปันผล = (6/100) × 1,500 = 90 บาท"], answer: "90 บาท" },
+            { id: 70, level: "medium", text: "ในสวนสัตว์เปิดมีสัตว์ทั้งหมด 640 ตัว เป็นสัตว์ปีก 30% สัตว์เลี้ยงลูกด้วยนม 45% ที่เหลือเป็นสัตว์เลื้อยคลาน มีสัตว์เลื้อยคลานกี่ตัว?", steps: ["1. สัตว์เลื้อยคลานคิดเป็น = 100% - (30% + 45%) = 25%", "2. จำนวนสัตว์เลื้อยคลาน = (25/100) × 640 = 160 ตัว"], answer: "160 ตัว" },
+
+            // ยาก (71-100)
+            { id: 71, level: "hard", text: "โทรทัศน์เครื่องหนึ่งติดราคาไว้ 12,500 บาท ร้านค้าลดราคาให้ 16% ถ้าคุณพ่อซื้อโทรทัศน์เครื่องนี้จะต้องจ่ายเงินกี่บาท?", steps: ["1. ส่วนลด 16% ของ 12,500 = (16/100) × 12,500 = 2,000 บาท", "2. ราคาที่ต้องจ่ายจริง = 12,500 - 2,000 = 10,500 บาท"], answer: "10,500 บาท" },
+            { id: 72, level: "hard", text: "ร้านค้าซื้อตู้เย็นมาราคา 8,500 บาท ต้องการขายให้ได้กำไร 22% ร้านค้าต้องตั้งราคาขายตู้เย็นกี่บาท?", steps: ["1. กำไรที่ต้องการ = (22/100) × 8,500 = 1,870 บาท", "2. ราคาขาย = 8,500 + 1,870 = 10,370 บาท"], answer: "10,370 บาท" },
+            { id: 73, level: "hard", text: "ซื้อโทรศัพท์มือถือมาราคา 6,400 บาท ใช้ไปสักพักนำไปขายต่อขาดทุน 15% ขายโทรศัพท์มือถือไปในราคากี่บาท?", steps: ["1. ขาดทุน = (15/100) × 6,400 = 960 บาท", "2. ราคาที่ขายไป = 6,400 - 960 = 5,440 บาท"], answer: "5,440 บาท" },
+            { id: 74, level: "hard", text: "เสื้อร้าน A ติดราคา 400 บาท ลดราคา 25% ส่วนเสื้อแบบเดียวกันร้าน B ติดราคา 380 บาท ลดราคา 20% ร้านใดขายถูกกว่ากัน และถูกกว่ากี่บาท?", steps: ["1. ร้าน A: ลด 100 บาท -> ขายจริง 400 - 100 = 300 บาท", "2. ร้าน B: ลด 76 บาท -> ขายจริง 380 - 76 = 304 บาท", "3. ร้าน A ขายถูกกว่าร้าน B อยู่ 304 - 300 = 4 บาท"], answer: "ร้าน A ขายถูกกว่า และถูกกว่า 4 บาท" },
+            { id: 75, level: "hard", text: "คุณแม่มีเงิน 4,000 บาท ซื้อของใช้ในบ้านไป 35% ของเงินที่มี และซื้ออาหารสดไปอีก 1,200 บาท คุณแม่เหลือเงินกี่บาท?", steps: ["1. ซื้อของใช้ในบ้าน = (35/100) × 4,000 = 1,400 บาท", "2. รวมใช้เงินไป = 1,400 + 1,200 = 2,600 บาท", "3. คุณแม่เหลือเงิน = 4,000 - 2,600 = 1,400 บาท"], answer: "1,400 บาท" },
+            { id: 76, level: "hard", text: "ปีที่แล้วโรงเรียนมีนักเรียน 650 คน ปีนี้มีจำนวนนักเรียนเพิ่มขึ้นจากปีที่แล้ว 12% ปีนี้โรงเรียนมีนักเรียนทั้งหมดกี่คน?", steps: ["1. นักเรียนเพิ่มขึ้น = (12/100) × 650 = 78 คน", "2. ปีนี้มีนักเรียนทั้งหมด = 650 + 78 = 728 คน"], answer: "728 คน" },
+            { id: 77, level: "hard", text: "เดือนที่แล้วครอบครัวจ่ายค่าไฟฟ้า 2,400 บาท เดือนนี้ช่วยกันประหยัดทำให้ค่าไฟฟ้าลดลง 15% เดือนนี้จ่ายค่าไฟฟ้ากี่บาท?", steps: ["1. ค่าไฟฟ้าลดลง = (15/100) × 2,400 = 360 บาท", "2. เดือนนี้จ่ายค่าไฟฟ้า = 2,400 - 360 = 2,040 บาท"], answer: "2,040 บาท" },
+            { id: 78, level: "hard", text: "คุณยายฝากเงินธนาคาร 15,000 บาท อัตราดอกเบี้ยร้อยละ 3 ต่อปี เมื่อครบ 1 ปี คุณยายจะมีเงินรวมดอกเบี้ยทั้งหมดกี่บาท?", steps: ["1. ดอกเบี้ย 1 ปี = (3/100) × 15,000 = 450 บาท", "2. เงินรวมทั้งหมด = 15,000 + 450 = 15,450 บาท"], answer: "15,450 บาท" },
+            { id: 79, level: "hard", text: "ในกล่องมีลูกบอลสีแดง 36 ลูก ซึ่งคิดเป็น 30% ของลูกบอลทั้งหมดในกล่อง ในกล่องมีลูกบอลทั้งหมดกี่ลูก?", steps: ["1. ลูกบอล 30% คิดเป็น 36 ลูก", "2. ลูกบอล 100% (ทั้งหมด) = (36 ÷ 30) × 100 = 120 ลูก"], answer: "120 ลูก" },
+            { id: 80, level: "hard", text: "ร้านค้าลดราคาจักรยาน 20% คิดเป็นเงินส่วนลด 540 บาท เดิมร้านค้าติดราคาจักรยานไว้กี่บาท?", steps: ["1. ส่วนลด 20% เท่ากับ 540 บาท", "2. ราคาเต็ม 100% = (540 ÷ 20) × 100 = 2,700 บาท"], answer: "2,700 บาท" },
+            { id: 81, level: "hard", text: "แม่ค้าขายกระเป๋าได้กำไร 25% คิดเป็นเงินกำไร 180 บาท แม่ค้าซื้อกระเป๋าใบนี้มาราคาทุนกี่บาท และขายไปกี่บาท?", steps: ["1. กำไร 25% เท่ากับ 180 บาท -> ทุน 100% = (180 ÷ 25) × 100 = 720 บาท", "2. ราคาขาย = 720 + 180 = 900 บาท"], answer: "ราคาทุน 720 บาท และขายไป 900 บาท" },
+            { id: 82, level: "hard", text: "ซื้อเสื้อ 2 ตัว ราคาตัวละ 350 บาท และกางเกง 1 ตัว ราคา 500 บาท ถ้าร้านค้าลดราคาให้ 15% ของยอดซื้อทั้งหมด ต้องจ่ายเงินกี่บาท?", steps: ["1. ราคารวมก่อนลด = (2 × 350) + 500 = 1,200 บาท", "2. ส่วนลด 15% = 180 บาท -> จ่ายเงินจริง = 1,200 - 180 = 1,020 บาท"], answer: "1,020 บาท" },
+            { id: 83, level: "hard", text: "พ่อค้าซื้อไข่ไก่มา 200 ฟอง ราคา 700 บาท แตกไป 20 ฟอง ที่เหลือนำไปขายฟองละ 4.50 บาท พ่อค้าได้กำไรกี่บาท และคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. ไข่ที่เหลือขายได้ 180 ฟอง × 4.50 = 810 บาท", "2. ได้กำไร = 810 - 700 = 110 บาท -> คิดเป็น (110/700) × 100 ≈ 15.71%"], answer: "ได้กำไร 110 บาท (ประมาณ 15.71%)" },
+            { id: 84, level: "hard", text: "อ่านหนังสือไปแล้ว 60% ยังเหลือหน้าที่ยังไม่ได้อ่านอีก 96 หน้า หนังสือเล่มนี้มีทั้งหมดกี่หน้า?", steps: ["1. หน้าที่ยังไม่ได้อ่านคิดเป็น 100% - 60% = 40%", "2. 40% เท่ากับ 96 หน้า -> ทั้งหมด 100% = (96 ÷ 40) × 100 = 240 หน้า"], answer: "240 หน้า" },
+            { id: 85, level: "hard", text: "ส้มโอ 300 ผล คัดเกรด A ได้ 40% เกรด B ได้ 45% ที่เหลือเป็นเกรด C ส้มโอเกรด A มีมากกว่าเกรด C กี่ผล?", steps: ["1. เกรด A = 40% ของ 300 = 120 ผล", "2. เกรด C = 15% ของ 300 = 45 ผล", "3. เกรด A มากกว่าเกรด C = 120 - 45 = 75 ผล"], answer: "75 ผล" },
+            { id: 86, level: "hard", text: "รับประทานอาหารในร้านอาหารราคา 1,400 บาท ทางร้านคิดภาษีมูลค่าเพิ่ม 7% จะต้องจ่ายเงินค่าอาหารรวมภาษีทั้งหมดกี่บาท?", steps: ["1. ภาษีมูลค่าเพิ่ม 7% = (7/100) × 1,400 = 98 บาท", "2. ยอดชำระรวมภาษี = 1,400 + 98 = 1,498 บาท"], answer: "1,498 บาท" },
+            { id: 87, level: "hard", text: "ซื้อพัดลมมาในราคา 765 บาท หลังจากได้รับส่วนลด 15% แล้ว เดิมพัดลมเครื่องนี้ติดราคาไว้กี่บาท?", steps: ["1. ลดราคา 15% แสดงว่าจ่ายเงินจริง 85% ของราคาป้าย", "2. 85% = 765 บาท -> ราคาป้าย 100% = (765 ÷ 85) × 100 = 900 บาท"], answer: "900 บาท" },
+            { id: 88, level: "hard", text: "ขายรองเท้าไปราคา 1,320 บาท ได้กำไร 10% รองเท้าคู่นี้มีราคาทุนกี่บาท?", steps: ["1. ได้กำไร 10% แสดงว่าราคาขายคิดเป็น 110% ของราคาทุน", "2. 110% = 1,320 บาท -> ราคาทุน 100% = (1,320 ÷ 110) × 100 = 1,200 บาท"], answer: "1,200 บาท" },
+            { id: 89, level: "hard", text: "ขายโต๊ะไม้ไปราคา 2,160 บาท ขาดทุน 10% โต๊ะไม้ตัวนี้ราคาทุนกี่บาท?", steps: ["1. ขาดทุน 10% แสดงว่าราคาขายคิดเป็น 90% ของราคาทุน", "2. 90% = 2,160 บาท -> ราคาทุน 100% = (2,160 ÷ 90) × 100 = 2,400 บาท"], answer: "2,400 บาท" },
+            { id: 90, level: "hard", text: "มีเงินอยู่ 2,000 บาท วันแรกใช้ไป 25% วันที่สองใช้ไป 40% ของเงินที่เหลือจากวันแรก สุดท้ายเหลือเงินกี่บาท?", steps: ["1. วันแรกใช้ไป 500 บาท -> เหลือเงิน 1,500 บาท", "2. วันที่สองใช้ไป 40% ของ 1,500 = 600 บาท -> เหลือ 1,500 - 600 = 900 บาท"], answer: "900 บาท" },
+            { id: 91, level: "hard", text: "ร้านค้าติดราคาขายสินค้าไว้สูงกว่าทุน 40% ถ้าสินค้าชิ้นนี้ราคาทุน 500 บาท และร้านค้าลดราคาจากป้าย 10% ร้านค้าจะยังได้กำไรกี่บาท?", steps: ["1. ติดราคาป้าย = 500 + 200 = 700 บาท", "2. ลดราคา 10% จากป้าย (70 บาท) -> ขายจริง 630 บาท", "3. ได้กำไร = 630 - 500 = 130 บาท"], answer: "ได้กำไร 130 บาท" },
+            { id: 92, level: "hard", text: "โรงเรียนมีนักเรียนทั้งหมด 800 คน เป็นนักเรียนชาย 45% ถ้าวันนี้นักเรียนชายมาเรียน 90% ของนักเรียนชายทั้งหมด วันนี้นักเรียนชายขาดเรียนกี่คน?", steps: ["1. นักเรียนชายทั้งหมด = 45% ของ 800 = 360 คน", "2. ขาดเรียน 10% ของ 360 = 36 คน"], answer: "36 คน" },
+            { id: 93, level: "hard", text: "สนามหญ้ารูปสี่เหลี่ยมผืนผ้ากว้าง 15 เมตร ยาว 20 เมตร ปลูกดอกไม้ 30% ของพื้นที่ทั้งหมด พื้นที่ปลูกดอกไม้มีกี่ตารางเมตร?", steps: ["1. พื้นที่สนามหญ้า = 15 × 20 = 300 ตารางเมตร", "2. พื้นที่ปลูกดอกไม้ = 30% ของ 300 = 90 ตารางเมตร"], answer: "90 ตารางเมตร" },
+            { id: 94, level: "hard", text: "ในงานเลี้ยงมีผู้หญิง 132 คน และผู้ชาย 108 คน ผู้หญิงคิดเป็นกี่เปอร์เซ็นต์ของผู้ร่วมงานทั้งหมด?", steps: ["1. ผู้ร่วมงานทั้งหมด = 132 + 108 = 240 คน", "2. ผู้หญิงคิดเป็น = (132 / 240) × 100 = 55%"], answer: "55%" },
+            { id: 95, level: "hard", text: "กระเป๋าเดินทางติดราคา 3,000 บาท ลดราคาครั้งแรก 20% และถ้าจ่ายด้วยบัตรเครดิตจะลดเพิ่มอีก 10% จากราคาที่ลดแล้ว ต้องจ่ายเงินกี่บาท?", steps: ["1. ลดครั้งแรก 20% = 600 บาท -> เหลือ 2,400 บาท", "2. ลดเพิ่ม 10% ของ 2,400 = 240 บาท -> จ่ายสุทธิ 2,160 บาท"], answer: "2,160 บาท" },
+            { id: 96, level: "hard", text: "พ่อค้าขายสินค้า 2 ชิ้น ชิ้นละ 990 บาท ชิ้นแรกได้กำไร 10% ชิ้นที่สองขาดทุน 10% รวมแล้วพ่อค้าได้กำไรหรือขาดทุนกี่บาท?", steps: ["1. ชิ้นแรก: ทุน = (990 ÷ 110) × 100 = 900 บาท", "2. ชิ้นที่สอง: ทุน = (990 ÷ 90) × 100 = 1,100 บาท", "3. ทุนรวม 2,000 บาท ขายรวม 1,980 บาท -> ขาดทุน 20 บาท"], answer: "ขาดทุน 20 บาท" },
+            { id: 97, level: "hard", text: "น้ำเชื่อม 200 มิลลิลิตร มีน้ำตาลละลายอยู่ 25% ถ้าเติมน้ำเปล่าลงไปอีก 300 มิลลิลิตร น้ำเชื่อมถ้วยใหม่นี้จะมีความเข้มข้นของน้ำตาลกี่เปอร์เซ็นต์?", steps: ["1. ปริมาณน้ำตาล = 25% ของ 200 = 50 มิลลิลิตร", "2. ปริมาตรรวมใหม่ = 200 + 300 = 500 มิลลิลิตร -> เข้มข้น (50/500) × 100 = 10%"], answer: "10%" },
+            { id: 98, level: "hard", text: "นักเรียนชั้น ป.5 สอบผ่านคณิตศาสตร์ 85% ของนักเรียนทั้งหมด ถ้ามีนักเรียนสอบไม่ผ่าน 18 คน นักเรียนชั้น ป.5 มีทั้งหมดกี่คน?", steps: ["1. สอบไม่ผ่านคิดเป็น 100% - 85% = 15%", "2. 15% = 18 คน -> ทั้งหมด 100% = (18 ÷ 15) × 100 = 120 คน"], answer: "120 คน" },
+            { id: 99, level: "hard", text: "สมศักดิ์มีรายได้เดือนละ 18,000 บาท จ่ายค่าเช่าบ้าน 25% ค่าอาหาร 40% และค่าเดินทาง 15% ที่เหลือเก็บออม สมศักดิ์เก็บเงินได้ปีละกี่บาท?", steps: ["1. เก็บออมต่อเดือน = 100% - (25% + 40% + 15%) = 20%", "2. ออมเดือนละ = 3,600 บาท -> 1 ปี (12 เดือน) = 3,600 × 12 = 43,200 บาท"], answer: "43,200 บาทต่อปี" },
+            { id: 100, level: "hard", text: "ร้านผลไม้ซื้อทุเรียนมา 500 กิโลกรัม กิโลกรัมละ 80 บาท คัดทิ้งเพราะเน่าเสีย 10% ที่เหลือขายไปกิโลกรัมละ 110 บาท ร้านค้าจะได้กำไรทั้งหมดกี่บาท และคิดเป็นกี่เปอร์เซ็นต์?", steps: ["1. ทุนทั้งหมด = 500 × 80 = 40,000 บาท", "2. เหลือทุเรียนดี 450 กก. ขายได้ 450 × 110 = 49,500 บาท", "3. ได้กำไร = 9,500 บาท คิดเป็น (9,500 / 40,000) × 100 = 23.75%"], answer: "ได้กำไร 9,500 บาท คิดเป็น 23.75%" }
+        ];
+
+        // =========================================================================
+        // สถานะและการควบคุมหน้าจอ
+        // =========================================================================
+        let currentIndex = 0;
+        let currentFilter = 'all';
+
+        function renderQuestion(index) {
+            currentIndex = index;
+            const q = questionsDB[index];
+
+            // เปลี่ยนสีพื้นหลังของหน้าจอตามหมายเลขข้อ
+            const body = document.getElementById('app-body');
+            const themeClass = bgThemes[index % bgThemes.length];
+            body.className = `min-h-screen flex flex-col justify-between bg-gradient-to-br ${themeClass} text-slate-800 selection:bg-indigo-200 relative overflow-x-hidden`;
+
+            // อัปเดตเลขข้อและระดับ
+            document.getElementById('q-number-badge').textContent = `ข้อที่ ${q.id} / 100`;
+            const levelBadge = document.getElementById('q-level-badge');
+            if (q.level === 'easy') {
+                levelBadge.className = 'hidden sm:inline-flex items-center px-4 py-1.5 rounded-full text-base sm:text-lg font-bold bg-white/75 backdrop-blur-md text-emerald-800 border border-white/60 shadow-sm';
+                levelBadge.innerHTML = '<i class="fa-solid fa-seedling mr-1.5 text-emerald-600"></i> ระดับง่าย';
+            } else if (q.level === 'medium') {
+                levelBadge.className = 'hidden sm:inline-flex items-center px-4 py-1.5 rounded-full text-base sm:text-lg font-bold bg-white/75 backdrop-blur-md text-amber-800 border border-white/60 shadow-sm';
+                levelBadge.innerHTML = '<i class="fa-solid fa-star-half-stroke mr-1.5 text-amber-500"></i> ระดับปานกลาง';
+            } else {
+                levelBadge.className = 'hidden sm:inline-flex items-center px-4 py-1.5 rounded-full text-base sm:text-lg font-bold bg-white/75 backdrop-blur-md text-rose-800 border border-white/60 shadow-sm';
+                levelBadge.innerHTML = '<i class="fa-solid fa-fire mr-1.5 text-rose-500"></i> ระดับยาก';
+            }
+
+            // แทรกภาพประกอบ SVG และตัวโจทย์
+            document.getElementById('q-illustration').innerHTML = getIllustrationSVG(q.text);
+            document.getElementById('q-text').textContent = q.text;
+
+            // เตรียมเฉลย
+            const expContainer = document.getElementById('q-explanation');
+            expContainer.innerHTML = q.steps.map(step => `<p class="pl-3 border-l-4 border-emerald-400">${step}</p>`).join('');
+            document.getElementById('q-final-answer').textContent = q.answer;
+
+            hideAnswer();
+
+            // รีเซ็ต Animation
+            const stage = document.getElementById('question-stage');
+            stage.classList.remove('fade-in');
+            void stage.offsetWidth;
+            stage.classList.add('fade-in');
+
+            // ล้างเส้นที่เขียนค้างไว้เมื่อเปลี่ยนข้อใหม่
+            clearCanvas();
+        }
+
+        // =========================================================================
+        // ระบบกระดานเขียนสำหรับปากกา iPad (Apple Pencil / Touch / Mouse)
+        // =========================================================================
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawingMode = false;
+        let isDrawing = false;
+        let isErasing = false;
+        let currentPenColor = '#1e293b';
+        let lastX = 0;
+        let lastY = 0;
+
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            if (canvas.width > 0 && canvas.height > 0) {
+                tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
+            }
+
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.scale(dpr, dpr);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+                ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width / dpr, tempCanvas.height / dpr);
+            }
+        }
+
+        function toggleDrawingMode() {
+            isDrawingMode = !isDrawingMode;
+            const toolbar = document.getElementById('pen-toolbar');
+            const btn = document.getElementById('toggle-pen-btn');
+            const btnText = document.getElementById('toggle-pen-text');
+
+            if (isDrawingMode) {
+                canvas.classList.remove('pointer-events-none');
+                canvas.classList.add('cursor-crosshair');
+                toolbar.classList.remove('hidden');
+                btn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-heading font-bold px-7 py-3 rounded-full shadow-lg transition-all flex items-center gap-2 text-xl sm:text-2xl active:scale-95';
+                btn.querySelector('i').className = 'fa-solid fa-pen-nib text-white text-base';
+                btnText.textContent = 'กำลังเขียน';
+                showToast('เปิดโหมดปากกาแล้ว สามารถใช้ปากกา iPad เขียนบนจอได้เลยครับ');
+            } else {
+                canvas.classList.add('pointer-events-none');
+                canvas.classList.remove('cursor-crosshair');
+                toolbar.classList.add('hidden');
+                btn.className = 'bg-white/90 hover:bg-white backdrop-blur-md text-amber-700 font-heading font-bold px-7 py-3 rounded-full shadow-md border border-amber-200 transition-all flex items-center gap-2 text-xl sm:text-2xl active:scale-95';
+                btn.querySelector('i').className = 'fa-solid fa-pen-nib text-amber-500 text-base';
+                btnText.textContent = 'เปิดปากกา';
+            }
+        }
+
+        function setPenColor(color, btnEl) {
+            isErasing = false;
+            currentPenColor = color;
+            document.querySelectorAll('.pen-color-btn').forEach(b => {
+                b.classList.remove('ring-2', 'ring-offset-2', 'ring-slate-800', 'scale-110');
+            });
+            document.getElementById('eraser-btn').classList.remove('bg-slate-200', 'text-slate-900');
+            btnEl.classList.add('ring-2', 'ring-offset-2', 'ring-slate-800', 'scale-110');
+        }
+
+        function setEraser(btnEl) {
+            isErasing = true;
+            document.querySelectorAll('.pen-color-btn').forEach(b => {
+                b.classList.remove('ring-2', 'ring-offset-2', 'ring-slate-800', 'scale-110');
+            });
+            btnEl.classList.add('bg-slate-200', 'text-slate-900');
+        }
+
+        function clearCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+        }
+
+        // รองรับ Pointer Events (ทำงานร่วมกับ Apple Pencil, Touch และเมาส์ได้ลื่นไหล)
+        canvas.addEventListener('pointerdown', (e) => {
+            if (!isDrawingMode) return;
+            isDrawing = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            canvas.setPointerCapture(e.pointerId);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isDrawing || !isDrawingMode) return;
+            e.preventDefault();
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(e.clientX, e.clientY);
+
+            if (isErasing) {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = 28;
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = currentPenColor;
+                const pressure = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
+                ctx.lineWidth = Math.max(2.5, pressure * 6);
+            }
+
+            ctx.stroke();
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            ctx.globalCompositeOperation = 'source-over';
+            canvas.releasePointerCapture(e.pointerId);
+        });
+
+        canvas.addEventListener('pointercancel', () => {
+            isDrawing = false;
+            ctx.globalCompositeOperation = 'source-over';
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+
+        function toggleAnswer() {
+            const ansBox = document.getElementById('answer-box');
+            const btnText = document.getElementById('toggle-answer-text');
+            if (ansBox.classList.contains('hidden')) {
+                ansBox.classList.remove('hidden');
+                btnText.textContent = 'ซ่อนเฉลย';
+            } else {
+                hideAnswer();
+            }
+        }
+
+        function hideAnswer() {
+            document.getElementById('answer-box').classList.add('hidden');
+            document.getElementById('toggle-answer-text').textContent = 'ดูเฉลย';
+        }
+
+        function setFilter(level) {
+            currentFilter = level;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.dataset.level === level) {
+                    btn.className = 'filter-btn active px-3.5 py-1 rounded-full bg-slate-800 text-white transition-all';
+                } else {
+                    btn.className = 'filter-btn px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition-all';
+                }
+            });
+            pickRandomQuestion();
+        }
+
+        function pickRandomQuestion() {
+            const filtered = questionsDB.filter(q => currentFilter === 'all' || q.level === currentFilter);
+            if (!filtered.length) return;
+            let nextQ;
+            if (filtered.length === 1) {
+                nextQ = filtered[0];
+            } else {
+                do {
+                    nextQ = filtered[Math.floor(Math.random() * filtered.length)];
+                } while (nextQ.id === questionsDB[currentIndex].id);
+            }
+            renderQuestion(questionsDB.findIndex(item => item.id === nextQ.id));
+        }
+
+        function nextQuestion() {
+            const filtered = questionsDB.filter(q => currentFilter === 'all' || q.level === currentFilter);
+            const pos = filtered.findIndex(q => q.id === questionsDB[currentIndex].id);
+            const nextPos = (pos + 1) % filtered.length;
+            renderQuestion(questionsDB.findIndex(item => item.id === filtered[nextPos].id));
+        }
+
+        function prevQuestion() {
+            const filtered = questionsDB.filter(q => currentFilter === 'all' || q.level === currentFilter);
+            const pos = filtered.findIndex(q => q.id === questionsDB[currentIndex].id);
+            const prevPos = (pos - 1 + filtered.length) % filtered.length;
+            renderQuestion(questionsDB.findIndex(item => item.id === filtered[prevPos].id));
+        }
+
+        // โหมดขยายเต็มหน้าจอ (Full-screen API)
+        function toggleFullScreen() {
+            const btn = document.getElementById('fullscreen-btn');
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    btn.innerHTML = '<i class="fa-solid fa-compress"></i>';
+                }).catch(() => {
+                    showToast('เบราว์เซอร์ไม่อนุญาตให้ขยายเต็มจออัตโนมัติ (กด F11 ได้ครับ)');
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    btn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+                }
+            }
+        }
+
+        function toggleAllListModal() {
+            const modal = document.getElementById('all-list-modal');
+            if (modal.classList.contains('hidden')) {
+                populateModalList();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function populateModalList() {
+            const container = document.getElementById('modal-list-container');
+            const filtered = questionsDB.filter(q => currentFilter === 'all' || q.level === currentFilter);
+            container.innerHTML = filtered.map(q => {
+                const idx = questionsDB.findIndex(item => item.id === q.id);
+                let badgeColor = q.level === 'easy' ? 'bg-emerald-100 text-emerald-800' :
+                                 q.level === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
+                let levelText = q.level === 'easy' ? 'ง่าย' : q.level === 'medium' ? 'ปานกลาง' : 'ยาก';
+                return `
+                    <div onclick="selectFromModal(${idx})" class="p-3.5 rounded-2xl border ${idx === currentIndex ? 'border-indigo-500 bg-indigo-50/70' : 'border-slate-200 hover:bg-slate-50'} cursor-pointer transition-colors flex items-start justify-between gap-3">
+                        <div class="flex items-start gap-2.5">
+                            <span class="font-bold text-indigo-700 shrink-0 w-12">ข้อ ${q.id}.</span>
+                            <span class="text-base text-slate-800 line-clamp-2">${q.text}</span>
+                        </div>
+                        <span class="text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${badgeColor}">${levelText}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectFromModal(idx) {
+            renderQuestion(idx);
+            toggleAllListModal();
+        }
+
+        function jumpToQuestion() {
+            const val = parseInt(document.getElementById('jump-input').value, 10);
+            if (isNaN(val) || val < 1 || val > 100) {
+                showToast('กรุณากรอกเลขข้อ 1 ถึง 100');
+                return;
+            }
+            currentFilter = 'all';
+            renderQuestion(val - 1);
+            document.getElementById('jump-input').value = '';
+            toggleAllListModal();
+        }
+
+        function copyQuestionText() {
+            const q = questionsDB[currentIndex];
+            const copyStr = `ข้อที่ ${q.id}: ${q.text}\nเฉลย:\n${q.steps.join('\n')}\nคำตอบ: ${q.answer}`;
+            const textarea = document.createElement('textarea');
+            textarea.value = copyStr;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('คัดลอกโจทย์และเฉลยเรียบร้อยแล้ว');
+            } catch (err) {}
+            document.body.removeChild(textarea);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            toast.classList.remove('-translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('-translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        // รองรับปุ่มลูกศรซ้าย-ขวาบนคีย์บอร์ดเพื่อเปลี่ยนข้อ
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.key === 'ArrowRight') nextQuestion();
+            if (e.key === 'ArrowLeft') prevQuestion();
+        });
+
+        window.onload = function () {
+            resizeCanvas();
+            renderQuestion(0);
+        };
+    </script>
+</body>
+</html>
